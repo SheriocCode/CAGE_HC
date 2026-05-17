@@ -51,7 +51,8 @@ class MultiPoly(Dataset):
 
         ### Note: here is a hack which assumes door/window have category_id 16, 17 in structured3D
         if self.semantic_classes == -1:
-            target = [t for t in target if t['category_id'] not in [16, 17]]
+            # target = [t for t in target if t['category_id'] not in [16, 17]]
+            target = [t for t in target if t['category_id'] not in [7, 8, 9, 10, 11, 12, 13, 14]]  # HC 中门窗
 
         path = coco.loadImgs(img_id)[0]['file_name']
 

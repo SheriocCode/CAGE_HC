@@ -17,6 +17,7 @@ from s3d_floorplan_eval.options import MCSSOptions
 from s3d_floorplan_eval.DataRW.S3DRW import S3DRW
 from s3d_floorplan_eval.DataRW.wrong_annotatios import wrong_s3d_annotations_list
 from scenecad_eval.Evaluator import Evaluator_SceneCAD
+from hc_eval.Evaluator import Evaluator_HC
 from util.poly_ops import pad_gt_polys,pad_gt_polys_to_edges,get_gt_polys
 from util.plot_utils import plot_room_map, plot_score_map, plot_floorplan_with_regions, plot_semantic_rich_floorplan,plot_room_map_with_edges,plot_floorplan_with_edges
 from util.edge_utils import remove_short_edges,get_corners_from_edges,remove_duplicate_corners,merge_points,refine_rooms,remove_multi_polygon,remove_rooms_with_iou
@@ -125,6 +126,13 @@ def evaluate(model, criterion, dataset_name, data_loader, device,epoch = None):
             elif dataset_name == 'scenecad':
                 gt_polys = [gt_instances[i].gt_masks.polygons[0][0].reshape(-1,2).astype(np.int)]
                 evaluator = Evaluator_SceneCAD()
+            elif dataset_name == 'hc':
+                gt_polys = []
+                for poly in gt_instances[i].gt_masks.polygons:
+                    # 每个poly对应一个房间
+                    corners = poly[0].reshape(-1, 2).astype(np.int)
+                    gt_polys.append(corners)
+                evaluator = Evaluator_HC()
             
             print("Running Evaluation for scene %s" % scene_ids[i])
 
@@ -207,6 +215,8 @@ def evaluate(model, criterion, dataset_name, data_loader, device,epoch = None):
                                                             window_door_lines=window_doors, 
                                                             window_door_lines_types=window_doors_types)
             elif dataset_name == 'scenecad':
+                quant_result_dict_scene = evaluator.evaluate_scene(room_polys=room_polys, gt_polys=gt_polys)
+            elif dataset_name == 'hc':
                 quant_result_dict_scene = evaluator.evaluate_scene(room_polys=room_polys, gt_polys=gt_polys)
 
             if 'room_iou' in quant_result_dict_scene:
@@ -314,6 +324,13 @@ def evaluate_floor(model, dataset_name, data_loader, device, output_dir, plot_pr
             elif dataset_name == 'scenecad':
                 gt_polys = [gt_instances[i].gt_masks.polygons[0][0].reshape(-1,2).astype(np.int)]
                 evaluator = Evaluator_SceneCAD()
+            elif dataset_name == 'hc':
+                gt_polys = []
+                for poly in gt_instances[i].gt_masks.polygons:
+                    # 每个poly对应一个房间
+                    corners = poly[0].reshape(-1, 2).astype(np.int)
+                    gt_polys.append(corners)
+                evaluator = Evaluator_HC()
 
             print("Running Evaluation for scene %s" % scene_ids[i])
 
@@ -410,6 +427,8 @@ def evaluate_floor(model, dataset_name, data_loader, device, output_dir, plot_pr
                                                             window_door_lines_types=window_doors_types)
     
             elif dataset_name == 'scenecad':
+                quant_result_dict_scene = evaluator.evaluate_scene(room_polys=room_polys, gt_polys=gt_polys)
+            elif dataset_name == 'hc':
                 quant_result_dict_scene = evaluator.evaluate_scene(room_polys=room_polys, gt_polys=gt_polys)
 
             if quant_result_dict is None:

@@ -107,6 +107,7 @@ def get_args_parser():
                         help='device to use for training / testing')
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--resume', default='', help='resume from checkpoint')
+    parser.add_argument('--fine_tune', default='', help='fine-tune from pretrained(on other dataset) model')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
     parser.add_argument('--num_workers', default=2, type=int)
@@ -245,6 +246,13 @@ def main(args):
             model, criterion, args.dataset_name, data_loader_val, device
         )
 
+    # 微调
+    if args.fine_tune:
+        checkpoint = torch.load(args.resume, map_location='cpu')
+        missing_keys, unexpected_keys = model.load_state_dict(checkpoint['model'], strict=False)
+        # 对于微调：只加载模型权重，不加载优化器和调度器状态
+        print("Fine-tuning mode: loading model weights only, skipping optimizer and lr_scheduler")
+
     print("Start training")
     start_time = time.time()
     torch.cuda.empty_cache()
@@ -255,23 +263,63 @@ def main(args):
             model, criterion, data_loader_train, optimizer, device, epoch, args.clip_max_norm,args=args)
         lr_scheduler.step()
         peak = torch.cuda.max_memory_allocated() / 1024**2
-        if args.output_dir:
-            checkpoint_paths = [output_dir / 'checkpoint.pth']
-            # extra checkpoint before LR drop and every 50 epochs
-            if epoch < 500:
-                if (epoch + 1) in args.lr_drop or (epoch + 1) % 50 == 0:
-                    checkpoint_paths.append(output_dir / f'checkpoint{epoch:04}.pth')
-            else :
-                if (epoch + 1) in args.lr_drop or (epoch + 1) % 10 == 0:
-                    checkpoint_paths.append(output_dir / f'checkpoint{epoch:04}.pth')
-            for checkpoint_path in checkpoint_paths:
-                torch.save({
-                    'model': model.state_dict(),
-                    'optimizer': optimizer.state_dict(),
-                    'lr_scheduler': lr_scheduler.state_dict(),
-                    'epoch': epoch,
-                    'args': args,
-                }, checkpoint_path)
+        if args.resume:
+            # resume ckpt继续训练
+            if args.output_dir:
+                checkpoint_paths = [output_dir / 'checkpoint.pth']
+                # extra checkpoint before LR drop and every 50 epochs
+                if epoch < 500:
+                    if (epoch + 1) in args.lr_drop or (epoch + 1) % 50 == 0:
+                        checkpoint_paths.append(output_dir / f'checkpoint{epoch:04}.pth')
+                else :
+                    if (epoch + 1) in args.lr_drop or (epoch + 1) % 10 == 0:
+                        checkpoint_paths.append(output_dir / f'checkpoint{epoch:04}.pth')
+                for checkpoint_path in checkpoint_paths:
+                    torch.save({
+                        'model': model.state_dict(),
+                        'optimizer': optimizer.state_dict(),
+                        'lr_scheduler': lr_scheduler.state_dict(),
+                        'epoch': epoch,
+                        'args': args,
+                    }, checkpoint_path)
+        elif args.fine_tune:
+            # 微调
+            if args.output_dir:
+                checkpoint_paths = [output_dir / 'checkpoint.pth']
+                # extra checkpoint before LR drop and every 50 epochs
+                if epoch < 500:
+                    if (epoch + 1) in args.lr_drop or (epoch + 1) % 50 == 0:
+                        checkpoint_paths.append(output_dir / f'checkpoint{epoch:04}.pth')
+                else :
+                    if (epoch + 1) in args.lr_drop or (epoch + 1) % 10 == 0:
+                        checkpoint_paths.append(output_dir / f'checkpoint{epoch:04}.pth')
+                for checkpoint_path in checkpoint_paths:
+                    torch.save({
+                        'model': model.state_dict(),
+                        'optimizer': optimizer.state_dict(),
+                        'lr_scheduler': lr_scheduler.state_dict(),
+                        'epoch': epoch,
+                        'args': args,
+                    }, checkpoint_path)
+        else:
+            # 正常训练
+            if args.output_dir:
+                checkpoint_paths = [output_dir / 'checkpoint.pth']
+                # extra checkpoint before LR drop and every 50 epochs
+                if epoch < 500:
+                    if (epoch + 1) in args.lr_drop or (epoch + 1) % 50 == 0:
+                        checkpoint_paths.append(output_dir / f'checkpoint{epoch:04}.pth')
+                else :
+                    if (epoch + 1) in args.lr_drop or (epoch + 1) % 10 == 0:
+                        checkpoint_paths.append(output_dir / f'checkpoint{epoch:04}.pth')
+                for checkpoint_path in checkpoint_paths:
+                    torch.save({
+                        'model': model.state_dict(),
+                        'optimizer': optimizer.state_dict(),
+                        'lr_scheduler': lr_scheduler.state_dict(),
+                        'epoch': epoch,
+                        'args': args,
+                    }, checkpoint_path)
 
         test_stats = evaluate(
             model, criterion, args.dataset_name, data_loader_val, device
