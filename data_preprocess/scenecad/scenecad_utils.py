@@ -244,12 +244,13 @@ def get_floor_corners(scan_name, floorplan_path):
     return verts, edge_dict
 
 
-def normalize_point(corner, min_x, width, min_y, height):
-        img_x = np.clip(int(math.floor((corner[0] - min_x) * 1.0 / width * 256)), 0, 255)
-        img_y = np.clip(int(math.floor((corner[1] - min_y) * 1.0 / height * 256)), 0, 255)
-        return img_x, img_y
+def normalize_point(corner, min_x, width, min_y, height, image_size=256):
+    coord_max = image_size - 1
+    img_x = np.clip(int(math.floor((corner[0] - min_x) * 1.0 / width * image_size)), 0, coord_max)
+    img_y = np.clip(int(math.floor((corner[1] - min_y) * 1.0 / height * image_size)), 0, coord_max)
+    return img_x, img_y
 
-def generate_density(xyz, normal=False):
+def generate_density(xyz, normal=False, image_size=256):
 
 
     # xyz = xyz * 1000.0
@@ -275,11 +276,11 @@ def generate_density(xyz, normal=False):
 
     xyz = (xyz - mins) / max_range  # re-scale coords into [0.0, 1.0]
 
-    coordinates = np.round(xyz[:,:2] * 256)
+    coordinates = np.round(xyz[:,:2] * image_size)
     coordinates = np.minimum(np.maximum(coordinates, 0),
-                                255)
+                                image_size - 1)
 
-    density = np.zeros((256, 256), dtype=np.float32)
+    density = np.zeros((image_size, image_size), dtype=np.float32)
 
     unique_coordinates, counts = np.unique(coordinates, return_counts=True, axis=0)
 
@@ -292,6 +293,7 @@ def generate_density(xyz, normal=False):
     normalization_dict["min_x"] = mins[0][0]
     normalization_dict["min_y"] = mins[0][1]
     normalization_dict["max_range"] = max_range
+    normalization_dict["image_size"] = image_size
 
 
     if normal:
@@ -322,8 +324,9 @@ def normalize_annotations(scan_name, SCANNET_FLOOR_PATH, normalization_dict):
     min_x = normalization_dict["min_x"]
     min_y = normalization_dict["min_y"]
     width = height = normalization_dict["max_range"]
+    image_size = normalization_dict.get("image_size", 256)
     for corner in corners:
-        corner_in_img = normalize_point(corner, min_x, width, min_y, height)
+        corner_in_img = normalize_point(corner, min_x, width, min_y, height, image_size=image_size)
         corners_in_img.append(corner_in_img[:2])
     corners_in_img = np.stack(corners_in_img).astype(np.float64)
 
@@ -341,7 +344,7 @@ def normalize_annotations(scan_name, SCANNET_FLOOR_PATH, normalization_dict):
     return corners_in_img, heat_annot
 
 
-def generate_coco_dict(polygons, curr_instance_id, curr_img_id):
+def generate_coco_dict(polygons, curr_instance_id, curr_img_id, image_size=256):
 
 
     coco_annotation_dict_list = []
@@ -368,8 +371,8 @@ def generate_coco_dict(polygons, curr_instance_id, curr_img_id):
         bb_x_min = np.maximum(np.min(bb_x) - bound_pad, 0)
         bb_y_min = np.maximum(np.min(bb_y) - bound_pad, 0)
 
-        bb_x_max = np.minimum(np.max(bb_x) + bound_pad, 256 - 1)
-        bb_y_max = np.minimum(np.max(bb_y) + bound_pad, 256 - 1)
+        bb_x_max = np.minimum(np.max(bb_x) + bound_pad, image_size - 1)
+        bb_y_max = np.minimum(np.max(bb_y) + bound_pad, image_size - 1)
 
         bb_width = (bb_x_max - bb_x_min)
         bb_height = (bb_y_max - bb_y_min)

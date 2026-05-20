@@ -9,6 +9,7 @@ import torch
 import matplotlib.pyplot as plt
 import cv2
 import numpy as np
+from util.image_size import image_size_to_hw
 from scipy.spatial import Delaunay
 import os
 import shapely
@@ -115,15 +116,14 @@ class Evaluator_HC():
         plt.savefig("joint_mask.png", bbox_inches='tight')
         assert False
 
-    def evaluate_scene(self, room_polys, gt_polys, show=False, name="ours", dataset_type="hc"):
+    def evaluate_scene(self, room_polys, gt_polys, show=False, name="ours", dataset_type="hc", image_size=256):
 
         gt_polys_list = [np.concatenate([poly, poly[None, 0]]) for poly in gt_polys]
         room_polys = [np.concatenate([poly, poly[None, 0]]) for poly in room_polys]
         
         ignore_mask_region = None
 
-        # img_size = (joint_room_map.shape[0], joint_room_map.shape[1])
-        img_size = (256, 256)
+        img_size = image_size_to_hw(image_size)
         quant_result_dict = self.get_quantitative(gt_polys_list, ignore_mask_region, room_polys, None, img_size, dataset_type=dataset_type)
 
         return quant_result_dict

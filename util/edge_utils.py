@@ -3,12 +3,14 @@ import cv2
 from shapely.geometry import Polygon, MultiPolygon
 from shapely.geometry import LineString
 from shapely.ops import unary_union
+from util.image_size import image_size_to_hw
 
-def remove_rooms_with_iou(polygon_list):
+def remove_rooms_with_iou(polygon_list, image_size=256):
     # Compute the IOU between each pair
+    height, width = image_size_to_hw(image_size)
     room_map_list = []
     for room_ind, poly in enumerate(polygon_list):
-        room_map = np.zeros((256, 256))
+        room_map = np.zeros((height, width))
         cv2.fillPoly(room_map, [np.array(poly.exterior.coords, dtype=np.int32)[:-1]], color=1.)
         room_map_list.append(room_map)
 
@@ -210,17 +212,22 @@ def compute_intersections_matrix(edges, threshold=10):
 
     return mask, intersections, valid, valid_both, valid_first, valid_second, valid_out
 
-def remove_multi_polygon(polygon_lst):
+def remove_multi_polygon(polygon_lst, image_size=256):
+    height, width = image_size_to_hw(image_size)
+    x_max = width - 1
+    y_max = height - 1
+
     for poly_idx, polygon in enumerate(polygon_lst):
         connect_edges = []
         if isinstance(polygon, MultiPolygon):
+            polygon_geoms = list(polygon.geoms)
             poly_eqs = []
             poly_pts = []
             poly_v = []
 
-            for sub_polygon in polygon.geoms:
+            for sub_polygon in polygon_geoms:
 
-                poly_np = np.array(sub_polygon.exterior.coords, dtype=np.uint8)[:-1]
+                poly_np = np.array(sub_polygon.exterior.coords, dtype=np.int32)[:-1]
                 simplified_poly_np = simplify_polygon(poly_np)
                 poly_np = simplified_poly_np
                 poly_eq = []
@@ -252,11 +259,11 @@ def remove_multi_polygon(polygon_lst):
                     pt = poly_pt[eq_i]
 
                     if eq[0] == float('inf'):  # Vertical line
-                        line = LineString([(eq[1], 0), (eq[1], 255)])
+                        line = LineString([(eq[1], 0), (eq[1], y_max)])
                     elif eq[0] == 0:  # Horizontal line
-                        line = LineString([(0, eq[1]), (255, eq[1])])
+                        line = LineString([(0, eq[1]), (x_max, eq[1])])
                     else:  # Diagonal line
-                        line = LineString([(0, eq[1]), (255, eq[0] * 255 + eq[1])])
+                        line = LineString([(0, eq[1]), (x_max, eq[0] * x_max + eq[1])])
                     
                     intersection = line.intersection(Polygon(tgt_polygon))
 
@@ -288,9 +295,9 @@ def remove_multi_polygon(polygon_lst):
                             connect_edges.append([min_pt, min_ip])
             
             if len(connect_edges) == 1:
-                merge_polygon = polygon[0] if polygon[0].area > polygon[1].area else polygon[1]
+                merge_polygon = polygon_geoms[0] if polygon_geoms[0].area > polygon_geoms[1].area else polygon_geoms[1]
             else:
-                edge_points = np.array([point for edge in connect_edges for point in edge], dtype=np.uint8)
+                edge_points = np.array([point for edge in connect_edges for point in edge], dtype=np.int32)
                 new_edge_points = []
                 new_edge_points.append(edge_points[0])
                 edge_points = np.delete(edge_points, 0, axis=0)
@@ -303,7 +310,7 @@ def remove_multi_polygon(polygon_lst):
                 edge_polygon = Polygon(new_edge_points)                
                 merge_polygon = unary_union([Polygon(src_polygon), Polygon(tgt_polygon), edge_polygon])
 
-            poly_np = np.array(merge_polygon.exterior.coords, dtype=np.uint8)[:-1]
+            poly_np = np.array(merge_polygon.exterior.coords, dtype=np.int32)[:-1]
             simplified_poly_np = simplify_polygon(poly_np)
             poly_np = np.concatenate([simplified_poly_np, simplified_poly_np[None, 0]])
             update_polygon = Polygon(poly_np)
@@ -409,7 +416,7 @@ def simplify_polygon(input_poly):
         if is_angle_change(input_poly[(i - 1)%len(input_poly)], input_poly[i], input_poly[(i + 1)%len(input_poly)]):
             simplified_poly_np.append(input_poly[i])
 
-    simplified_poly_np = np.array(simplified_poly_np, dtype=np.uint8)
+    simplified_poly_np = np.array(simplified_poly_np, dtype=np.int32)
     
     return simplified_poly_np
 

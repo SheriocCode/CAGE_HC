@@ -13,6 +13,7 @@ Our data preprocessing code is largely built upon scripts from [Structured3D](ht
   ```shell
   python generate_coco_stru3d.py --data_root=Structured3D_panorama --output=coco_stru3d
   ```
+  Add `--image_size=1024` to generate 1024x1024 density maps and annotations.
 
 ### SceneCAD
 * Step 1: download 3D scans (\<scanId\>\_vh_clean_2.ply) from [ScanNet](https://github.com/ScanNet/ScanNet). 
@@ -26,6 +27,7 @@ Our data preprocessing code is largely built upon scripts from [Structured3D](ht
   ```shell
   python generate_coco_scenecad.py --data_root=ScanNet --scannet_floor_path=2Dfloor_planes --scans_transform_path=scans_transform --output=coco_scenecad
   ```
+  Add `--image_size=1024` to generate 1024x1024 density maps and annotations.
 
 *** ***Clarify details for SceneCAD*** ***: 
 

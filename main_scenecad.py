@@ -97,6 +97,8 @@ def get_args_parser():
     # dataset parameters
     parser.add_argument('--dataset_name', default='scenecad')
     parser.add_argument('--dataset_root', default='/home/lyy/edge/data/scenecad', type=str)
+    parser.add_argument('--image_size', default=256, type=int,
+                        help='input density-map size; use 1024 for 1024x1024 inputs')
 
     parser.add_argument('--output_dir', default='output',
                         help='path where to save, empty for no saving')
@@ -241,7 +243,8 @@ def main(args):
             lr_scheduler.step(lr_scheduler.last_epoch )
         # check the resumed model
         test_stats = evaluate(
-            model, criterion, args.dataset_name, data_loader_val, device
+            model, criterion, args.dataset_name, data_loader_val, device,
+            image_size=args.image_size
         )
 
     print("Start training")
@@ -269,7 +272,8 @@ def main(args):
                 }, checkpoint_path)
 
         test_stats = evaluate(
-            model, criterion, args.dataset_name, data_loader_val, device
+            model, criterion, args.dataset_name, data_loader_val, device,
+            image_size=args.image_size
         )
 
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},

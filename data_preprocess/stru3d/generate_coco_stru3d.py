@@ -23,12 +23,14 @@ def config():
     a = argparse.ArgumentParser(description='Generate coco format data for Structured3D')
     a.add_argument('--data_root', default='Structured3D_panorama', type=str, help='path to raw Structured3D_panorama folder')
     a.add_argument('--output', default='coco_stru3d', type=str, help='path to output folder')
+    a.add_argument('--image_size', default=256, type=int, help='output density-map size')
     
     args = a.parse_args()
     return args
 
 def main(args):
     data_root = args.data_root
+    image_size = args.image_size
     data_parts = os.listdir(data_root)
 
     ### prepare
@@ -80,7 +82,7 @@ def main(args):
             xyz = points[:, :3]
 
             ### project point cloud to density map
-            density, normalization_dict = generate_density(xyz, width=256, height=256)
+            density, normalization_dict = generate_density(xyz, width=image_size, height=image_size)
             
             ### rescale raw annotations
             normalized_annos = normalize_annotations(scene_path, normalization_dict)
@@ -90,12 +92,12 @@ def main(args):
             img_dict = {}
             img_dict["file_name"] = scene_id + '.png'
             img_dict["id"] = img_id
-            img_dict["width"] = 256
-            img_dict["height"] = 256
+            img_dict["width"] = image_size
+            img_dict["height"] = image_size
 
             ### parse annotations
             polys = parse_floor_plan_polys(normalized_annos)
-            polygons_list = generate_coco_dict(normalized_annos, polys, instance_id, img_id, ignore_types=['outwall'])
+            polygons_list = generate_coco_dict(normalized_annos, polys, instance_id, img_id, ignore_types=['outwall'], image_size=image_size)
 
             instance_id += len(polygons_list)
 

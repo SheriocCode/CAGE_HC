@@ -129,6 +129,7 @@ We adapt the evaluation scripts from MonteFloor to evaluate SceneCAD:
 ```shell
 ./tools/eval_scenecad.sh
 ```
+For non-256 inputs, pass the same size used during preprocessing, for example `--image_size=1024`.
 
 ## Training
 The command for training RoomFormer on Structured3D is as follows:
@@ -139,6 +140,7 @@ Similarly, to train RoomFormer on SceneCAD, run the following command:
 ```shell
 ./tools/train_scenecad.sh
 ```
+For non-256 inputs, pass the same size used during preprocessing, for example `--image_size=1024`.
 
 <!-- 
 ## Semantically-rich Floorplan
@@ -174,5 +176,4 @@ We thank the authors of FRI-Net, PolyRoom, RoomFormer, HEAT and MonteFloor for p
 * [Detectron2](https://github.com/facebookresearch/detectron2)
 * [HEAT](https://github.com/woodfrog/heat)
 * [BoundaryFormer](https://github.com/mlpc-ucsd/BoundaryFormer)
-
 

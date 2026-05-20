@@ -3,6 +3,18 @@ Utilities for polygon manipulation.
 """
 import torch
 import numpy as np
+from util.image_size import coord_scale_values
+
+
+def _normalize_flat_coords(coords, image_size):
+    coords = coords.view(-1, 2)
+    scale = torch.as_tensor(
+        coord_scale_values(image_size, 2),
+        dtype=coords.dtype,
+        device=coords.device,
+    )
+    coords = torch.minimum(torch.maximum(coords, torch.zeros_like(scale)), scale)
+    return (coords / scale).view(-1)
 
 def is_clockwise(points):
     """Check whether a sequence of points is clockwise ordered
@@ -39,7 +51,7 @@ def get_all_order_corners(corners):
     return all_corners
 
 
-def pad_gt_polys(gt_instances, num_queries_per_poly, device):
+def pad_gt_polys(gt_instances, num_queries_per_poly, device, image_size=256):
     """Pad the ground truth polygons so that they have a uniform length
     """
 
@@ -53,7 +65,7 @@ def pad_gt_polys(gt_instances, num_queries_per_poly, device):
 
         for i, poly in enumerate(gt_inst.gt_masks.polygons):
             corners = torch.from_numpy(poly[0]).to(device)
-            corners = torch.clip(corners, 0, 255) / 255
+            corners = _normalize_flat_coords(corners, image_size)
             corner_lengths.append(len(corners))
 
             corners_pad = torch.zeros(num_queries_per_poly*2, device=device)
@@ -77,7 +89,7 @@ def pad_gt_polys(gt_instances, num_queries_per_poly, device):
     return room_targets
 
 
-def pad_gt_polys_to_edges(gt_instances, num_queries_per_poly, device):
+def pad_gt_polys_to_edges(gt_instances, num_queries_per_poly, device, image_size=256):
     """Pad the ground truth polygons so that they have a uniform length
     """
 
@@ -91,7 +103,7 @@ def pad_gt_polys_to_edges(gt_instances, num_queries_per_poly, device):
 
         for i, poly in enumerate(gt_inst.gt_masks.polygons):
             corners = torch.from_numpy(poly[0])
-            corners = torch.clip(corners, 0, 255) / 255
+            corners = _normalize_flat_coords(corners, image_size)
             num_corners = len(corners) // 2
             corners = corners.view(num_corners, 2)
             edges = torch.zeros((num_corners, 2, 2))
@@ -128,7 +140,7 @@ def pad_gt_polys_to_edges(gt_instances, num_queries_per_poly, device):
 
 
 
-def get_gt_polys(gt_instances, num_queries_per_poly, device):
+def get_gt_polys(gt_instances, num_queries_per_poly, device, image_size=256):
     room_targets = []
     # padding ground truth on-fly
     for gt_inst in gt_instances:
@@ -139,7 +151,7 @@ def get_gt_polys(gt_instances, num_queries_per_poly, device):
 
         for i, poly in enumerate(gt_inst.gt_masks.polygons):
             corners = torch.from_numpy(poly[0])
-            corners = torch.clip(corners, 0, 255) / 255
+            corners = _normalize_flat_coords(corners, image_size)
             num_corners = len(corners) // 2
             corners = corners.view(num_corners, 2)
             edges = torch.zeros((num_corners, 2, 2))
@@ -166,6 +178,5 @@ def get_gt_polys(gt_instances, num_queries_per_poly, device):
 
 
     return room_targets
-
 
 

@@ -54,7 +54,14 @@ class MCSSOptions:
                                  type=int,
                                  help="input image width",
                                  default=256)
+        self.parser.add_argument("--image_size",
+                                 type=int,
+                                 help="square input image size; overrides height and width when set",
+                                 default=None)
 
     def parse(self):
         self.options, unknown = self.parser.parse_known_args()
+        if self.options.image_size is not None:
+            self.options.height = self.options.image_size
+            self.options.width = self.options.image_size
         return self.options

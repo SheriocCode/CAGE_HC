@@ -637,7 +637,7 @@ def benchmark(args):
 
     images = []
     for idx in range(total_step):
-        img = torch.randn(1,256,256)
+        img = torch.randn(1, args.image_size, args.image_size)
         images.append(img)
 
     with torch.no_grad():

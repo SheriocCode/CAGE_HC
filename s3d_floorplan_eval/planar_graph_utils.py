@@ -3,9 +3,10 @@ import numpy as np
 import cv2
 from scipy import ndimage
 from shapely.geometry import Polygon
+from util.image_size import image_size_to_hw
 
 
-def extract_regions(adj_mat, corners, corner_sorted):
+def extract_regions(adj_mat, corners, corner_sorted, image_size=256):
     all_regions = list()
     cur_idx = 0
     corners = corners.astype(np.int)
@@ -15,7 +16,7 @@ def extract_regions(adj_mat, corners, corner_sorted):
         all_regions.extend(regions)
         cur_idx = _get_new_start(adj_mat, cur_idx, corners)
 
-    outwall_idx = get_outwall(all_regions, corners, corner_sorted)
+    outwall_idx = get_outwall(all_regions, corners, corner_sorted, image_size=image_size)
     all_regions.pop(outwall_idx)
 
     # all_regions = filter_regions(all_regions) # only used for drawing visualization
@@ -25,7 +26,7 @@ def extract_regions(adj_mat, corners, corner_sorted):
     return all_regions_coords
 
 
-def get_outwall(all_regions, corners, corner_sorted):
+def get_outwall(all_regions, corners, corner_sorted, image_size=256):
     """
         Find the outermost boundary loop, which should be discarded
     """
@@ -34,11 +35,11 @@ def get_outwall(all_regions, corners, corner_sorted):
         if len(regions_for_top_bot) == 1:
             return regions_for_top_bot[0]
         else:
-            areas = [_compute_region_area(corners[all_regions[idx]]) for idx in range(len(all_regions))]
+            areas = [_compute_region_area(corners[all_regions[idx]], image_size=image_size) for idx in range(len(all_regions))]
             max_idx = np.argmax(areas)
         return max_idx
     else:
-        areas = [_compute_region_area(corners[all_regions[idx]]) for idx in range(len(all_regions))]
+        areas = [_compute_region_area(corners[all_regions[idx]], image_size=image_size) for idx in range(len(all_regions))]
         max_idx = np.argmax(areas)
         return max_idx
 
@@ -50,8 +51,9 @@ def get_outwall(all_regions, corners, corner_sorted):
 #     return all_regions
 
 
-def _compute_region_area(region):
-    edge_map = np.zeros([256, 256])
+def _compute_region_area(region, image_size=256):
+    height, width = image_size_to_hw(image_size)
+    edge_map = np.zeros([height, width])
     for idx, c in enumerate(region[:-1]):
         cv2.line(edge_map, tuple(c), tuple(region[idx + 1]), 1, 3)
     reverse_edge_map = 1 - edge_map
@@ -262,13 +264,13 @@ def _remove_corner(idx, adj_list):
             _remove_corner(nb, adj_list)
 
 
-def get_regions_from_pg(pg, corner_sorted):
+def get_regions_from_pg(pg, corner_sorted, image_size=256):
     pg = cleanup_pg(pg)
     corners, adj_mat = preprocess_pg(pg)
     if len(corners) == 0:
         regions = []
     else:
-        regions = extract_regions(adj_mat, corners, corner_sorted)
+        regions = extract_regions(adj_mat, corners, corner_sorted, image_size=image_size)
     return regions
 
 
@@ -306,11 +308,13 @@ colors_12 = [
 ]
 
 
-def plot_floorplan_with_regions(regions, corners, edges, scale):
+def plot_floorplan_with_regions(regions, corners, edges, scale, image_size=256):
     colors = colors_12[:8]
+    height, width = image_size_to_hw(image_size)
+    xy_scale = np.array([scale / width, scale / height], dtype=np.float32)
 
-    regions = [(region * scale / 256).round().astype(np.int) for region in regions]
-    corners = (corners * scale / 256).round().astype(np.int)
+    regions = [(region * xy_scale).round().astype(np.int32) for region in regions]
+    corners = (corners * xy_scale).round().astype(np.int32)
 
     # define the color map
     room_colors = [colors[i % 8] for i in range(len(regions))]
@@ -354,4 +358,3 @@ def plot_floorplan_with_regions(regions, corners, edges, scale):
         cv2.line(image, tuple(c1), tuple(c2), color=(0, 0, 0, 255), thickness=3)
 
     return image
-

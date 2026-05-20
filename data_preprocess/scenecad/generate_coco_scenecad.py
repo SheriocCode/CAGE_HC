@@ -23,6 +23,7 @@ def config():
     a.add_argument('--val_list', default='scenecad/meta_data/scannetv2_val.txt', type=str, help='path to official val scene list')
     a.add_argument('--normal_map', default=True, type=str, help='if return normal map')
     a.add_argument('--viz', default=True, type=str, help='visualize for sanity check')
+    a.add_argument('--image_size', default=256, type=int, help='output density-map size')
     args = a.parse_args()
     return args
 
@@ -31,6 +32,7 @@ def main(args):
     SCANNET_FLOOR_PATH = args.scannet_floor_path
     SCANS_TRANSFORM_PATH = args.scans_transform_path
     FLOOR_OUT_PATH = args.output
+    image_size = args.image_size
 
     ANNO_OUT_PATH = os.path.join(FLOOR_OUT_PATH, 'annotations')
 
@@ -96,7 +98,7 @@ def main(args):
         xyz = transform(scene, xyz, SCANS_TRANSFORM_PATH)
 
         ### project point cloud to density map
-        density, normalization_dict, normal = generate_density(xyz, normal=True)
+        density, normalization_dict, normal = generate_density(xyz, normal=True, image_size=image_size)
 
         ### rescale raw annotations
 
@@ -109,8 +111,8 @@ def main(args):
         img_dict = {}
         img_dict["file_name"] = scan_id + '.png'
         img_dict["id"] = img_id
-        img_dict["width"] = 256
-        img_dict["height"] = 256
+        img_dict["width"] = image_size
+        img_dict["height"] = image_size
 
 
         ### viz
@@ -130,7 +132,7 @@ def main(args):
         if normal is not None:    
             cv2.imwrite(os.path.join(NORMAL_OUT_PATH, scan_id+'.png'), normal)
 
-        polygons_list = generate_coco_dict([polys], instance_id, img_id)
+        polygons_list = generate_coco_dict([polys], instance_id, img_id, image_size=image_size)
 
         assert len(polygons_list) == 1
         instance_id += len(polygons_list)

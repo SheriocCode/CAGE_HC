@@ -14,6 +14,7 @@ from imageio import imsave
 from shapely.geometry import LineString
 from shapely.geometry import Polygon
 from descartes.patch import PolygonPatch
+from util.image_size import image_size_to_hw
 
 
 colors_12 = [
@@ -119,11 +120,19 @@ RED = '#ff3333'
 BLACK = '#000000'
 
 
-def plot_floorplan_with_edges(regions, corners=None, edges=None, scale=256,density_map = None):
+def _scale_coords(coords, scale, image_size):
+    coords = np.asarray(coords)
+    height, width = image_size_to_hw(image_size)
+    xy_scale = np.array([scale / width, scale / height], dtype=np.float32)
+    coord_scale = np.tile(xy_scale, coords.shape[-1] // 2)
+    return (coords * coord_scale).round().astype(np.int32)
+
+
+def plot_floorplan_with_edges(regions, corners=None, edges=None, scale=256, density_map=None, image_size=256):
     """Draw floorplan map where different colors indicate different rooms
     """
 
-    regions = [(region * scale / 256).round().astype(np.int) for region in regions]
+    regions = [_scale_coords(region, scale, image_size) for region in regions]
 
     if density_map is not None:
         # Resize and invert density map
@@ -153,12 +162,12 @@ def plot_floorplan_with_edges(regions, corners=None, edges=None, scale=256,densi
 
     return image
 
-def plot_floorplan_with_regions(regions, corners=None, edges=None, scale=256):
+def plot_floorplan_with_regions(regions, corners=None, edges=None, scale=256, image_size=256):
     """Draw floorplan map where different colors indicate different rooms
     """
     colors = colors_12
 
-    regions = [(region * scale / 256).round().astype(np.int) for region in regions]
+    regions = [_scale_coords(region, scale, image_size) for region in regions]
 
     # define the color map
     room_colors = [colors[i] for i in range(len(regions))]

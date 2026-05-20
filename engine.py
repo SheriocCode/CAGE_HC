@@ -21,8 +21,29 @@ from hc_eval.Evaluator import Evaluator_HC
 from util.poly_ops import pad_gt_polys,pad_gt_polys_to_edges,get_gt_polys
 from util.plot_utils import plot_room_map, plot_score_map, plot_floorplan_with_regions, plot_semantic_rich_floorplan,plot_room_map_with_edges,plot_floorplan_with_edges
 from util.edge_utils import remove_short_edges,get_corners_from_edges,remove_duplicate_corners,merge_points,refine_rooms,remove_multi_polygon,remove_rooms_with_iou
+from util.image_size import coord_scale_values, image_size_to_hw
 options = MCSSOptions()
 opts = options.parse()
+
+
+def _denormalize_coords(coords, image_size):
+    scale = torch.as_tensor(
+        coord_scale_values(image_size, coords.shape[-1]),
+        dtype=coords.dtype,
+        device=coords.device,
+    )
+    return coords * scale
+
+
+def _y_max(image_size):
+    height, _ = image_size_to_hw(image_size)
+    return height - 1
+
+
+def _empty_rgb_map(image_size):
+    height, width = image_size_to_hw(image_size)
+    return np.zeros([height, width, 3])
+
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
@@ -36,11 +57,12 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     print_freq = 20
     
     for batched_inputs in metric_logger.log_every(data_loader, print_freq, header):
+        image_size = getattr(args, "image_size", 256)
         samples = [x["image"].to(device) for x in batched_inputs]
         gt_instances = [x["instances"].to(device) for x in batched_inputs]
-        room_targets = pad_gt_polys_to_edges(gt_instances, model.num_queries_per_poly, device)
+        room_targets = pad_gt_polys_to_edges(gt_instances, model.num_queries_per_poly, device, image_size=image_size)
 
-        targets = get_gt_polys(gt_instances, model.num_queries_per_poly, device)
+        targets = get_gt_polys(gt_instances, model.num_queries_per_poly, device, image_size=image_size)
 
         dn_args = (targets, args.scalar, args.label_noise_scale, args.poly_noise_scale)
 
@@ -79,7 +101,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
 
 @torch.no_grad()
-def evaluate(model, criterion, dataset_name, data_loader, device,epoch = None):
+def evaluate(model, criterion, dataset_name, data_loader, device, epoch=None, image_size=256):
 
     model.eval()
     criterion.eval()
@@ -92,7 +114,7 @@ def evaluate(model, criterion, dataset_name, data_loader, device,epoch = None):
         
         scene_ids = [x["image_id"]for x in batched_inputs]
         gt_instances = [x["instances"].to(device) for x in batched_inputs]
-        room_targets = pad_gt_polys_to_edges(gt_instances, model.num_queries_per_poly, device)
+        room_targets = pad_gt_polys_to_edges(gt_instances, model.num_queries_per_poly, device, image_size=image_size)
 
 
         outputs,_ = model(samples)
@@ -121,6 +143,7 @@ def evaluate(model, criterion, dataset_name, data_loader, device,epoch = None):
                     continue
                 curr_opts = copy.deepcopy(opts)
                 curr_opts.scene_id = "scene_0" + str(scene_ids[i])
+                curr_opts.height, curr_opts.width = image_size_to_hw(image_size)
                 curr_data_rw = S3DRW(curr_opts, mode = "online_eval")
                 evaluator = Evaluator(curr_data_rw, curr_opts)
             elif dataset_name == 'scenecad':
@@ -158,7 +181,7 @@ def evaluate(model, criterion, dataset_name, data_loader, device,epoch = None):
 
                 valid_corners_per_room = pred_corners_per_room[fg_mask_per_room]
                 if len(valid_corners_per_room)>0:
-                    corners = (valid_corners_per_room * 255).cpu().numpy()
+                    corners = _denormalize_coords(valid_corners_per_room, image_size).cpu().numpy()
                     edges = corners
                     corners,filtered_pred_logits = remove_short_edges(corners,pred_logits_per_room)
                     corners = get_corners_from_edges(corners,filtered_pred_logits)
@@ -192,8 +215,8 @@ def evaluate(model, criterion, dataset_name, data_loader, device,epoch = None):
                 shapely_poly = Polygon(points)
                 shapely_polygons.append(shapely_poly)
             try:
-                shapely_polygons = remove_multi_polygon(shapely_polygons)
-                shapely_polygons = remove_rooms_with_iou(shapely_polygons)
+                shapely_polygons = remove_multi_polygon(shapely_polygons, image_size=image_size)
+                shapely_polygons = remove_rooms_with_iou(shapely_polygons, image_size=image_size)
                 polygon_list,overlap = refine_rooms(shapely_polygons,overlap)
                 room_ = []
                 for polygon in polygon_list:
@@ -215,9 +238,9 @@ def evaluate(model, criterion, dataset_name, data_loader, device,epoch = None):
                                                             window_door_lines=window_doors, 
                                                             window_door_lines_types=window_doors_types)
             elif dataset_name == 'scenecad':
-                quant_result_dict_scene = evaluator.evaluate_scene(room_polys=room_polys, gt_polys=gt_polys)
+                quant_result_dict_scene = evaluator.evaluate_scene(room_polys=room_polys, gt_polys=gt_polys, image_size=image_size)
             elif dataset_name == 'hc':
-                quant_result_dict_scene = evaluator.evaluate_scene(room_polys=room_polys, gt_polys=gt_polys)
+                quant_result_dict_scene = evaluator.evaluate_scene(room_polys=room_polys, gt_polys=gt_polys, image_size=image_size)
 
             if 'room_iou' in quant_result_dict_scene:
                 metric_logger.update(room_iou=quant_result_dict_scene['room_iou'])
@@ -250,7 +273,7 @@ def evaluate(model, criterion, dataset_name, data_loader, device,epoch = None):
     return stats
 
 @torch.no_grad()
-def evaluate_floor(model, dataset_name, data_loader, device, output_dir, plot_pred=True, plot_density=True, plot_gt=True, semantic_rich=False):
+def evaluate_floor(model, dataset_name, data_loader, device, output_dir, plot_pred=True, plot_density=True, plot_gt=True, semantic_rich=False, image_size=256):
     model.eval()
     time_all = []
     quant_result_dict = None
@@ -280,7 +303,7 @@ def evaluate_floor(model, dataset_name, data_loader, device, output_dir, plot_pr
                         gt_polys.append(corners)
                         
                     gt_room_polys = [np.array(r) for r in gt_polys]
-                    gt_floorplan_map = plot_floorplan_with_regions(gt_room_polys, scale=1000)
+                    gt_floorplan_map = plot_floorplan_with_regions(gt_room_polys, scale=1000, image_size=image_size)
                     cv2.imwrite(os.path.join(output_dir, '{}_gt.png'.format(scene_ids[i])), gt_floorplan_map)
                 else:
                     # plot semantically-rich floorplan
@@ -288,7 +311,7 @@ def evaluate_floor(model, dataset_name, data_loader, device, output_dir, plot_pr
                     for j, poly in enumerate(gt_inst.gt_masks.polygons):
                         corners = poly[0].reshape(-1, 2).astype(np.int)
                         corners_flip_y = corners.copy()
-                        corners_flip_y[:,1] = 255 - corners_flip_y[:,1]
+                        corners_flip_y[:,1] = _y_max(image_size) - corners_flip_y[:,1]
                         corners = corners_flip_y
                         gt_sem_rich.append([corners, gt_inst.gt_classes.cpu().numpy()[j]])
 
@@ -319,6 +342,7 @@ def evaluate_floor(model, dataset_name, data_loader, device, output_dir, plot_pr
                     continue
                 curr_opts = copy.deepcopy(opts)
                 curr_opts.scene_id = "scene_0" + str(scene_ids[i])
+                curr_opts.height, curr_opts.width = image_size_to_hw(image_size)
                 curr_data_rw = S3DRW(curr_opts, mode = "test")
                 evaluator = Evaluator(curr_data_rw, curr_opts)
             elif dataset_name == 'scenecad':
@@ -359,7 +383,7 @@ def evaluate_floor(model, dataset_name, data_loader, device, output_dir, plot_pr
                     valid_corners_per_room = pred_corners_per_room[fg_mask_per_room]
 
                     if len(valid_corners_per_room)>0:
-                        corners = (valid_corners_per_room * 255).cpu().numpy()
+                        corners = _denormalize_coords(valid_corners_per_room, image_size).cpu().numpy()
                         edges = corners
                         corners,pred_logits_per_room = remove_short_edges(corners,pred_logits_per_room)
                         corners = np.around(corners).astype(np.int32)
@@ -401,7 +425,7 @@ def evaluate_floor(model, dataset_name, data_loader, device, output_dir, plot_pr
                 shapely_polygons.append(shapely_poly)
             try:
 
-                shapely_polygons = remove_rooms_with_iou(shapely_polygons)
+                shapely_polygons = remove_rooms_with_iou(shapely_polygons, image_size=image_size)
                 polygon_list,overlap = refine_rooms(shapely_polygons,overlap)
 
                 room_ = []
@@ -427,9 +451,9 @@ def evaluate_floor(model, dataset_name, data_loader, device, output_dir, plot_pr
                                                             window_door_lines_types=window_doors_types)
     
             elif dataset_name == 'scenecad':
-                quant_result_dict_scene = evaluator.evaluate_scene(room_polys=room_polys, gt_polys=gt_polys)
+                quant_result_dict_scene = evaluator.evaluate_scene(room_polys=room_polys, gt_polys=gt_polys, image_size=image_size)
             elif dataset_name == 'hc':
-                quant_result_dict_scene = evaluator.evaluate_scene(room_polys=room_polys, gt_polys=gt_polys)
+                quant_result_dict_scene = evaluator.evaluate_scene(room_polys=room_polys, gt_polys=gt_polys, image_size=image_size)
 
             if quant_result_dict is None:
                 quant_result_dict = quant_result_dict_scene
@@ -446,12 +470,12 @@ def evaluate_floor(model, dataset_name, data_loader, device, output_dir, plot_pr
                     for j in range(len(room_polys)):
                         temp_poly = room_polys[j]
                         temp_poly_flip_y = temp_poly.copy()
-                        temp_poly_flip_y[:,1] = 255 - temp_poly_flip_y[:,1]
+                        temp_poly_flip_y[:,1] = _y_max(image_size) - temp_poly_flip_y[:,1]
                         pred_sem_rich.append([temp_poly_flip_y, room_types[j]])
                     for j in range(len(window_doors)):
                         temp_line = window_doors[j]
                         temp_line_flip_y = temp_line.copy()
-                        temp_line_flip_y[:,1] = 255 - temp_line_flip_y[:,1]
+                        temp_line_flip_y[:,1] = _y_max(image_size) - temp_line_flip_y[:,1]
                         pred_sem_rich.append([temp_line_flip_y, window_doors_types[j]])
 
                     pred_sem_rich_path = os.path.join(output_dir, '{}_sem_rich_pred.png'.format(scene_ids[i]))
@@ -459,17 +483,17 @@ def evaluate_floor(model, dataset_name, data_loader, device, output_dir, plot_pr
                 else:
                     # plot regular room floorplan
                     room_polys = [np.array(r) for r in room_polys]
-                    floorplan_map = plot_floorplan_with_regions(room_polys, scale=1000)
+                    floorplan_map = plot_floorplan_with_regions(room_polys, scale=1000, image_size=image_size)
                     cv2.imwrite(os.path.join(output_dir, '{}_pred_floorplan.png'.format(scene_ids[i])), floorplan_map)
 
             room_edges = [np.array(r) for r in room_edges]
             density_map = np.transpose((samples[i] * 255).cpu().numpy(), [1, 2, 0])
-            edge_map = plot_floorplan_with_edges(room_edges, scale=1000,density_map = density_map)
+            edge_map = plot_floorplan_with_edges(room_edges, scale=1000, density_map=density_map, image_size=image_size)
 
             cv2.imwrite(os.path.join(output_dir, '{}_pred_edge.png'.format(scene_ids[i])), edge_map)
             density_map = np.transpose((samples[i] * 255).cpu().numpy(), [1, 2, 0])
             density_map = np.repeat(density_map, 3, axis=2)
-            pred_room_map = np.zeros([256, 256, 3])
+            pred_room_map = _empty_rgb_map(image_size)
 
             for room_poly in room_edges:
                 pred_room_map = plot_room_map_with_edges(room_poly, pred_room_map)
@@ -478,7 +502,7 @@ def evaluate_floor(model, dataset_name, data_loader, device, output_dir, plot_pr
             if plot_density:
                 density_map = np.transpose((samples[i] * 255).cpu().numpy(), [1, 2, 0])
                 density_map = np.repeat(density_map, 3, axis=2)
-                pred_room_map = np.zeros([256, 256, 3])
+                pred_room_map = _empty_rgb_map(image_size)
 
                 for room_poly in room_polys:
                     pred_room_map = plot_room_map(room_poly, pred_room_map)

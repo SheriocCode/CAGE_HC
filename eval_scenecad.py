@@ -73,6 +73,8 @@ def get_args_parser():
     parser.add_argument('--dataset_name', default='scenecad')
     parser.add_argument('--dataset_root', default='data/scenecad', type=str)
     parser.add_argument('--eval_set', default='val', type=str)
+    parser.add_argument('--image_size', default=256, type=int,
+                        help='input density-map size; use 1024 for 1024x1024 inputs')
 
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
@@ -142,7 +144,8 @@ def main(args):
                    plot_pred=args.plot_pred, 
                    plot_density=args.plot_density, 
                    plot_gt=args.plot_gt,
-                   semantic_rich=args.semantic_classes>0
+                   semantic_rich=args.semantic_classes>0,
+                   image_size=args.image_size
                    )
 
 

@@ -197,7 +197,7 @@ def build_backbone(args):
         use_checkpoint = getattr(args, 'use_checkpoint', False)
         train_backbone = args.lr_backbone > 0
         backbone_freeze_keywords = None
-        backbone = build_swin_transformer(args.backbone, pretrain_img_size=256, out_indices=tuple(return_interm_indices), dilation=args.dilation, use_checkpoint=use_checkpoint)
+        backbone = build_swin_transformer(args.backbone, pretrain_img_size=args.image_size, out_indices=tuple(return_interm_indices), dilation=args.dilation, use_checkpoint=use_checkpoint)
 
         backbone.strides = [8, 16, 32]
         if args.dilation:
@@ -240,7 +240,7 @@ def build_backbone(args):
         use_checkpoint = getattr(args, 'use_checkpoint', False)
         train_backbone = args.lr_backbone > 0
         backbone_freeze_keywords = None
-        backbone = build_swin_transformerV2(args.backbone, pretrain_img_size=256, out_indices=tuple(return_interm_indices), dilation=args.dilation, use_checkpoint=use_checkpoint)
+        backbone = build_swin_transformerV2(args.backbone, pretrain_img_size=args.image_size, out_indices=tuple(return_interm_indices), dilation=args.dilation, use_checkpoint=use_checkpoint)
         
         backbone.strides = [8, 16, 32]
         if args.dilation:

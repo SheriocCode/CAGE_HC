@@ -169,7 +169,7 @@ def convert_lines_to_vertices(lines):
 
 
 
-def generate_coco_dict(annos, polygons, curr_instance_id, curr_img_id, ignore_types):
+def generate_coco_dict(annos, polygons, curr_instance_id, curr_img_id, ignore_types, image_size=256):
 
     junctions = np.array([junc['coordinate'][:2] for junc in annos['junctions']])
 
@@ -222,8 +222,8 @@ def generate_coco_dict(annos, polygons, curr_instance_id, curr_img_id, ignore_ty
         bb_x_min = np.maximum(np.min(bb_x) - bound_pad, 0)
         bb_y_min = np.maximum(np.min(bb_y) - bound_pad, 0)
 
-        bb_x_max = np.minimum(np.max(bb_x) + bound_pad, 256 - 1)
-        bb_y_max = np.minimum(np.max(bb_y) + bound_pad, 256 - 1)
+        bb_x_max = np.minimum(np.max(bb_x) + bound_pad, image_size - 1)
+        bb_y_max = np.minimum(np.max(bb_y) + bound_pad, image_size - 1)
 
         bb_width = (bb_x_max - bb_x_min)
         bb_height = (bb_y_max - bb_y_min)
