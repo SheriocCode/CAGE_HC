@@ -85,6 +85,8 @@ def get_args_parser():
 
                         help='path where to save result')
     parser.add_argument('--use_angle_loss',default=True,type=bool)
+    parser.add_argument('--score_threshold', default=0.5, type=float,
+                        help='corner confidence threshold used during evaluation')
 
     # visualization options
     parser.add_argument('--plot_pred', default=True, type=bool, help="plot predicted floorplan")
@@ -148,7 +150,8 @@ def main(args):
                    plot_density=args.plot_density, 
                    plot_gt=args.plot_gt,
                    semantic_rich=args.semantic_classes>0,
-                   image_size=args.image_size
+                   image_size=args.image_size,
+                   score_threshold=args.score_threshold
                    )
 
 

@@ -101,7 +101,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
 
 @torch.no_grad()
-def evaluate(model, criterion, dataset_name, data_loader, device, epoch=None, image_size=256):
+def evaluate(model, criterion, dataset_name, data_loader, device, epoch=None, image_size=256, score_threshold=0.5):
 
     model.eval()
     criterion.eval()
@@ -128,7 +128,7 @@ def evaluate(model, criterion, dataset_name, data_loader, device, epoch=None, im
         pred_corners = outputs['pred_coords']
         pred_logits = torch.sigmoid(pred_logits)
 
-        fg_mask = pred_logits> 0.5 # select valid corners
+        fg_mask = pred_logits > score_threshold # select valid corners
 
         if 'pred_room_logits' in outputs:
             prob = torch.nn.functional.softmax(outputs['pred_room_logits'], -1)
@@ -273,7 +273,7 @@ def evaluate(model, criterion, dataset_name, data_loader, device, epoch=None, im
     return stats
 
 @torch.no_grad()
-def evaluate_floor(model, dataset_name, data_loader, device, output_dir, plot_pred=True, plot_density=True, plot_gt=True, semantic_rich=False, image_size=256):
+def evaluate_floor(model, dataset_name, data_loader, device, output_dir, plot_pred=True, plot_density=True, plot_gt=True, semantic_rich=False, image_size=256, score_threshold=0.5):
     model.eval()
     time_all = []
     quant_result_dict = None
@@ -328,7 +328,7 @@ def evaluate_floor(model, dataset_name, data_loader, device, output_dir, plot_pr
         pred_logits = outputs['pred_logits']
         pred_corners = outputs['pred_coords']
         pred_logits = torch.sigmoid(pred_logits)
-        fg_mask = pred_logits > 0.5 # select valid corners
+        fg_mask = pred_logits > score_threshold # select valid corners
 
         if 'pred_room_logits' in outputs:
             prob = torch.nn.functional.softmax(outputs['pred_room_logits'], -1)
