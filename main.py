@@ -251,7 +251,7 @@ def main(args):
 
     # 微调
     if args.fine_tune:
-        checkpoint = torch.load(args.resume, map_location='cpu')
+        checkpoint = torch.load(args.fine_tune, map_location='cpu')
         missing_keys, unexpected_keys = model.load_state_dict(checkpoint['model'], strict=False)
         # 对于微调：只加载模型权重，不加载优化器和调度器状态
         print("Fine-tuning mode: loading model weights only, skipping optimizer and lr_scheduler")
