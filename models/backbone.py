@@ -236,13 +236,13 @@ def build_backbone(args):
         backbone.num_channels = bb_num_channels 
     elif args.backbone in ['swinv2_L_192_22k']:
         pretrain_img_size = int(args.backbone.split('_')[-2])
-        return_interm_indices = [1,2,3]
+        return_interm_indices = [0, 1, 2, 3]
         use_checkpoint = getattr(args, 'use_checkpoint', False)
         train_backbone = args.lr_backbone > 0
         backbone_freeze_keywords = None
         backbone = build_swin_transformerV2(args.backbone, pretrain_img_size=args.image_size, out_indices=tuple(return_interm_indices), dilation=args.dilation, use_checkpoint=use_checkpoint)
         
-        backbone.strides = [8, 16, 32]
+        backbone.strides = [4, 8, 16, 32]
         if args.dilation:
             backbone.strides[-1] = backbone.strides[-1] // 2
 

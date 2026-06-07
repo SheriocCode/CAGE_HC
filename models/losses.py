@@ -202,9 +202,9 @@ class MaskRasterizationLoss(nn.Module):
     def __init__(self, cfg):
         super().__init__()
 
-        self.register_buffer("rasterize_at", torch.from_numpy(np.array([64, 64, 64, 64, 64, 64, 64, 64]).reshape(-1, 2)))
+        # self.register_buffer("rasterize_at", torch.from_numpy(np.array([64, 64, 64, 64, 64, 64, 64, 64]).reshape(-1, 2)))
         # self.register_buffer("rasterize_at", torch.from_numpy(np.array([128, 128, 128, 128, 128, 128, 128, 128]).reshape(-1, 2)))
-        # self.register_buffer("rasterize_at", torch.from_numpy(np.array([256, 256, 256, 256, 256, 256, 256, 256]).reshape(-1, 2)))
+        self.register_buffer("rasterize_at", torch.from_numpy(np.array([256, 256, 256, 256, 256, 256, 256, 256]).reshape(-1, 2)))
         self.inv_smoothness_schedule = (0.1,)
         self.inv_smoothness = self.inv_smoothness_schedule[0]
         self.inv_smoothness_iter = ()
@@ -264,8 +264,9 @@ class MaskRasterizationCost(nn.Module):
     def __init__(self, cfg):
         super().__init__()
 
-        self.register_buffer("rasterize_at", torch.from_numpy(np.array([64, 64, 64, 64, 64, 64, 64, 64]).reshape(-1, 2)))
+        # self.register_buffer("rasterize_at", torch.from_numpy(np.array([64, 64, 64, 64, 64, 64, 64, 64]).reshape(-1, 2)))
         # self.register_buffer("rasterize_at", torch.from_numpy(np.array([128, 128, 128, 128, 128, 128, 128, 128]).reshape(-1, 2)))
+        self.register_buffer("rasterize_at", torch.from_numpy(np.array([256, 256, 256, 256, 256, 256, 256, 256]).reshape(-1, 2)))
         self.inv_smoothness_schedule = (0.1,)
         self.inv_smoothness = self.inv_smoothness_schedule[0]
         self.inv_smoothness_iter = ()
