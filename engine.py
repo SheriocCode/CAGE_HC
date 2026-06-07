@@ -5,6 +5,7 @@ import math
 import os
 import sys
 import time
+from pathlib import Path
 from typing import Iterable
 import numpy as np
 from shapely.geometry import Polygon
@@ -278,6 +279,7 @@ def evaluate_floor(model, dataset_name, data_loader, device, output_dir, plot_pr
     time_all = []
     quant_result_dict = None
     scene_counter = 0
+    all_predictions = []
 
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
@@ -288,6 +290,7 @@ def evaluate_floor(model, dataset_name, data_loader, device, output_dir, plot_pr
         samples = [x["image"].to(device) for x in batched_inputs]
         scene_ids = [x["image_id"] for x in batched_inputs]
         gt_instances = [x["instances"].to(device) for x in batched_inputs]
+        filenames = [x["file_name"] for x in batched_inputs]
 
       
         # draw GT map
@@ -463,6 +466,12 @@ def evaluate_floor(model, dataset_name, data_loader, device, output_dir, plot_pr
 
             scene_counter += 1
 
+            # 收集预测结果用于导出predictions.json
+            all_predictions.append({
+                "file_name": filenames[i],
+                "room_polys": [poly.tolist() for poly in room_polys]
+            })
+
             if plot_pred:
                 if semantic_rich:
                     # plot predicted semantic rich floorplan
@@ -485,6 +494,26 @@ def evaluate_floor(model, dataset_name, data_loader, device, output_dir, plot_pr
                     room_polys = [np.array(r) for r in room_polys]
                     floorplan_map = plot_floorplan_with_regions(room_polys, scale=1000, image_size=image_size)
                     cv2.imwrite(os.path.join(output_dir, '{}_pred_floorplan.png'.format(scene_ids[i])), floorplan_map)
+                    # cv2.imwrite(os.path.join('{}_pred_floorplan.png'.format(filenames[i][0:-4])), floorplan_map)
+
+                    # 导出obj
+                    # 输出角点信息
+                    obj_path = Path(filenames[i])
+                    obj_filename = os.path.join(output_dir, '{}_pred.obj'.format(obj_path.stem))
+                    cv2.imwrite(os.path.join(output_dir, '{}_pred_floorplan.png'.format(obj_path.stem)), floorplan_map)
+                    print(obj_filename)
+                    with open(obj_filename, 'w') as f:
+                        vertex_offset = 1
+                        for obj_poly in room_polys:
+                            # Write vertices
+                            for vertex in obj_poly:
+                                f.write(f"v {vertex[0]} {vertex[1]} 0\n")
+                            # Write face
+                            f.write("f")
+                            for obj_i in range(len(obj_poly)):
+                                f.write(f" {vertex_offset + obj_i}")
+                            f.write("\n")
+                            vertex_offset += len(obj_poly)
 
             room_edges = [np.array(r) for r in room_edges]
             density_map = np.transpose((samples[i] * 255).cpu().numpy(), [1, 2, 0])
@@ -510,6 +539,12 @@ def evaluate_floor(model, dataset_name, data_loader, device, output_dir, plot_pr
                 # plot predicted polygon overlaid on the density map
                 pred_room_map = np.clip(pred_room_map + density_map, 0, 255)
                 cv2.imwrite(os.path.join(output_dir, '{}_pred_room_map.png'.format(scene_ids[i])), pred_room_map)
+
+    # 导出所有预测结果为predictions.json
+    predictions_path = os.path.join(output_dir, 'predictions.json')
+    with open(predictions_path, 'w') as f:
+        json.dump(all_predictions, f, indent=2)
+    print(f"Exported predictions to {predictions_path}")
 
     for k in quant_result_dict.keys():
         quant_result_dict[k] /= float(scene_counter)
