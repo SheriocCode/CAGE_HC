@@ -701,19 +701,29 @@ class SwinTransformerV2(nn.Module):
         flops += self.num_features * self.num_classes
         return flops
 def build_swin_transformerV2(modelname, pretrain_img_size, **kw):
-    assert modelname in ['swinv2_L_192_22k']
+    assert modelname in ['swinv2_L_192_22k', 'swinv2_L_192to384_22kto1k']
 
     model_para_dict = {
         'swinv2_L_192_22k': dict(
             embed_dim=192,
             depths=[ 2, 2, 18, 2 ],
             num_heads=[ 6, 12, 24, 48],
-            window_size=16
+            window_size=16,
+            pretrained_window_sizes=[12, 12, 12, 6]
+            ),
+        'swinv2_L_192to384_22kto1k': dict(
+            embed_dim=192,
+            depths=[ 2, 2, 18, 2 ],
+            num_heads=[ 6, 12, 24, 48],
+            window_size=24, 
+            pretrained_window_sizes=[24, 24, 24, 12] # 384 对应的预训练窗口是 24
             )
     }
     kw_cgf = model_para_dict[modelname]
+    # 单独把 pretrained_window_sizes 弹出来，避免和 **kw_cgf 冲突
+    pretrained_window_sizes = kw_cgf.pop('pretrained_window_sizes')
     kw_cgf.update(kw)
-    model = SwinTransformerV2(img_size=pretrain_img_size,in_chans=1,pretrained_window_sizes=[12, 12, 12, 6 ], **kw_cgf)
+    model = SwinTransformerV2(img_size=pretrain_img_size,in_chans=1,pretrained_window_sizes=pretrained_window_sizes, **kw_cgf)
     return model
 
 # if __name__ == "__main__":

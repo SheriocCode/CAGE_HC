@@ -274,5 +274,45 @@ def build_backbone(args):
             torch.cuda.empty_cache()
         bb_num_channels = backbone.num_features[4 - len(return_interm_indices):]
         backbone.num_channels = bb_num_channels 
+    # swinv2其他backbone
+    elif args.backbone in ['swinv2_L_192to384_22kto1k']:
+        return_interm_indices = [0,1,2,3]
+        use_checkpoint = getattr(args, 'use_checkpoint', False)
+        train_backbone = args.lr_backbone > 0
+        backbone_freeze_keywords = None
+        backbone = build_swin_transformerV2(args.backbone, pretrain_img_size=args.image_size, out_indices=tuple(return_interm_indices), dilation=args.dilation, use_checkpoint=use_checkpoint)
+        
+        backbone.strides = [4, 8, 16, 32]
+        if args.dilation:
+            backbone.strides[-1] = backbone.strides[-1] // 2
+
+        # freeze some layers
+        if backbone_freeze_keywords is not None:
+            for name, parameter in backbone.named_parameters():
+                for keyword in backbone_freeze_keywords:
+                    if keyword in name:
+                        parameter.requires_grad_(False)
+                        break
+        if use_checkpoint:
+            pretrained_dir = "pretrained"
+            PTDICT = {
+                'swinv2_L_192to384_22kto1k': 'swinv2_large_patch4_window12to24_192to384_22kto1k_ft.pth',
+            }
+            pretrainedpath = os.path.join(pretrained_dir, PTDICT[args.backbone])
+            checkpoint = torch.load(pretrainedpath, map_location='cpu')['model']
+            load_pretrained(checkpoint=checkpoint,model=backbone)
+            from collections import OrderedDict
+            def key_select_function(keyname):
+                if 'head' in keyname:
+                    return False
+                if args.dilation and 'layers.3' in keyname:
+                    return False
+                return True
+            _tmp_st = OrderedDict({k:v for k, v in clean_state_dict(checkpoint).items() if key_select_function(k)})
+            _tmp_st_output = backbone.load_state_dict(_tmp_st, strict=False)
+            del checkpoint
+            torch.cuda.empty_cache()
+        bb_num_channels = backbone.num_features[4 - len(return_interm_indices):]
+        backbone.num_channels = bb_num_channels 
     model = Joiner(backbone, position_embedding)
     return model
