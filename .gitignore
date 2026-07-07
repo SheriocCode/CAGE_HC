@@ -1,2 +1,23 @@
-__pycache__
-.pyc
+# CUDA / C++ build artifacts
+build/
+dist/
+*.so
+*.o
+*.egg-info/
+*.egg
+
+# diff_ras
+diff_ras/build/
+diff_ras/*.so
+
+# deformable attention
+models/ops/build/
+models/ops/dist/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Conda / env
+.env/
+.conda/
